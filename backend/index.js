@@ -129,7 +129,8 @@ app.post('/image-to-image', upload.single('init_image'), async (req, res) => {
     }
   } catch (err) {
     if (req.file) fs.unlinkSync(req.file.path);
-    res.status(500).json({ error: 'Failed to generate image-to-image.' });
+    console.error('Modelslab error:', err?.response?.data || err.message || err);
+    res.status(500).json({ error: 'Failed to generate image-to-image.', details: err?.response?.data || err.message || err });
   }
 });
 
