@@ -71,7 +71,7 @@ app.post('/image-to-image', upload.single('image'), async (req, res) => {
   try {
     const form = new FormData();
     form.append('prompt', prompt);
-    form.append('image', fs.createReadStream(req.file.path));
+    form.append('init_image', fs.createReadStream(req.file.path));
     form.append('model_id', 'seedream-4.5-i2i');
     form.append('aspect-ratio', '1:1');
     form.append('key', process.env.MODELSLAB_API_KEY);
