@@ -58,36 +58,67 @@ export default function App() {
     if (!input.trim() || loading) return;
     setLoading(true);
     setError("");
-    // If user uploaded an image and entered a prompt, do image-to-image
+    // If user uploaded an image and entered a prompt
     if (selectedImage) {
-      setMessages((prev) => [...prev, { role: 'user', content: `[Image-to-image: ${input}]`, imageUrl: selectedImage.uri }]);
-      try {
-        let localUri = selectedImage.uri;
-        let filename = localUri.split('/').pop();
-        let match = /\.([^.]+)$/.exec(filename);
-        let type = match && match[1].toLowerCase() === 'png' ? 'image/png' : 'image/jpeg';
-        if (!localUri.startsWith('file://')) localUri = 'file://' + localUri;
-        let formData = new FormData();
-        formData.append('init_image', { uri: localUri, name: filename, type });
-        formData.append('prompt', input);
-        const res = await fetch(IMAGE2IMAGE_URL, {
-          method: 'POST',
-          body: formData
-        });
-        const data = await res.json();
-        let url = data.imageUrl || data.image_url || data.image || (data.output && data.output[0]);
-        if (url) {
-          setMessages((prev) => [...prev, { role: 'image', imageUrl: url, content: `Image-to-image result for: ${input}` }]);
-        } else {
-          setError(data.error || 'No image returned.');
+      // If prompt requests description, use image-to-text
+      if (/describe|what is|analyze|explain|text|caption|summarize|content|recognize|identify/i.test(input)) {
+        setMessages((prev) => [...prev, { role: 'user', content: `[Image-to-text: ${input}]`, imageUrl: selectedImage.uri }]);
+        try {
+          let localUri = selectedImage.uri;
+          let filename = localUri.split('/').pop();
+          let match = /\.([^.]+)$/.exec(filename);
+          let type = match && match[1].toLowerCase() === 'png' ? 'image/png' : 'image/jpeg';
+          if (!localUri.startsWith('file://')) localUri = 'file://' + localUri;
+          let formData = new FormData();
+          formData.append('image', { uri: localUri, name: filename, type });
+          const res = await fetch(VISION_URL, {
+            method: 'POST',
+            body: formData
+          });
+          const data = await res.json();
+          if (data.reply) {
+            setMessages((prev) => [...prev, { role: 'assistant', content: data.reply }]);
+          } else {
+            setError(data.error || 'No reply from server.');
+          }
+        } catch (err) {
+          setError('Network error.');
         }
-      } catch (err) {
-        setError('Network error.');
+        setSelectedImage(null);
+        setInput("");
+        setLoading(false);
+        return;
+      } else {
+        // Otherwise, image-to-image
+        setMessages((prev) => [...prev, { role: 'user', content: `[Image-to-image: ${input}]`, imageUrl: selectedImage.uri }]);
+        try {
+          let localUri = selectedImage.uri;
+          let filename = localUri.split('/').pop();
+          let match = /\.([^.]+)$/.exec(filename);
+          let type = match && match[1].toLowerCase() === 'png' ? 'image/png' : 'image/jpeg';
+          if (!localUri.startsWith('file://')) localUri = 'file://' + localUri;
+          let formData = new FormData();
+          formData.append('init_image', { uri: localUri, name: filename, type });
+          formData.append('prompt', input);
+          const res = await fetch(IMAGE2IMAGE_URL, {
+            method: 'POST',
+            body: formData
+          });
+          const data = await res.json();
+          let url = data.imageUrl || data.image_url || data.image || (data.output && data.output[0]);
+          if (url) {
+            setMessages((prev) => [...prev, { role: 'image', imageUrl: url, content: `Image-to-image result for: ${input}` }]);
+          } else {
+            setError(data.error || 'No image returned.');
+          }
+        } catch (err) {
+          setError('Network error.');
+        }
+        setSelectedImage(null);
+        setInput("");
+        setLoading(false);
+        return;
       }
-      setSelectedImage(null);
-      setInput("");
-      setLoading(false);
-      return;
     }
     // If prompt looks like an image generation request, use Pollinations
     if (/generate an? image of|draw|create an? image of|make an? image of|picture of|image of|photo of/i.test(input)) {
