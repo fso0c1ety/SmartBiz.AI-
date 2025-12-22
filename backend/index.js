@@ -105,16 +105,18 @@ app.post('/image-to-image', upload.single('init_image'), async (req, res) => {
     form.append('init_image', imageUrl); // Send as URL
     form.append('model_id', 'seedream-4.5-i2i');
     form.append('aspect-ratio', '1:1');
-    // Send API key as a header instead of query parameter or form field
+    // Send JSON body to Modelslab, as in working example
     const mlRes = await axios.post(
       'https://modelslab.com/api/v7/images/image-to-image',
-      form,
       {
-        headers: {
-          ...form.getHeaders(),
-          'api_key': 'Cp790n9sL087P3wLcxo6aJPVUifFPE7pPxVlnNO9K6QKlekEut7YMjBsCqv2'
-        }
-      }
+        key: 'Cp790n9sL087P3wLcxo6aJPVUifFPE7pPxVlnNO9K6QKlekEut7YMjBsCqv2', // or process.env.MODELSLAB_API_KEY
+        model_id: 'seedream-4.5-i2i',
+        prompt,
+        init_image: imageUrl,
+        aspect_ratio: '1:1'
+        // add other params as needed
+      },
+      { headers: { 'Content-Type': 'application/json' } }
     );
     // Log the full response for debugging
     console.log('Modelslab response:', JSON.stringify(mlRes.data));
