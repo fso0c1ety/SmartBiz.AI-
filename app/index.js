@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Image, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,6 +10,21 @@ export default function App() {
   const [messages, setMessages] = useState([
     { role: 'system', content: 'Hello this is SmartBiz.ai' }
   ]);
+
+  // Load chat history from AsyncStorage on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const saved = await AsyncStorage.getItem('chat_messages');
+        if (saved) setMessages(JSON.parse(saved));
+      } catch (e) {}
+    })();
+  }, []);
+
+  // Save chat history to AsyncStorage whenever messages change
+  useEffect(() => {
+    AsyncStorage.setItem('chat_messages', JSON.stringify(messages));
+  }, [messages]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [selectedImage, setSelectedImage] = useState(null); // For image-to-image
@@ -36,13 +52,14 @@ export default function App() {
         let formData = new FormData();
         formData.append('init_image', { uri: localUri, name: filename, type });
         formData.append('prompt', input);
-        const res = await fetch('http://localhost:8080/image-to-image', {
+        const res = await fetch(IMAGE2IMAGE_URL, {
           method: 'POST',
           body: formData
         });
         const data = await res.json();
-        if (data.image_url || data.imageUrl) {
-          setMessages((prev) => [...prev, { role: 'image', imageUrl: data.image_url || data.imageUrl, content: `Image-to-image result for: ${input}` }]);
+        let url = data.imageUrl || data.image_url || data.image || (data.output && data.output[0]);
+        if (url) {
+          setMessages((prev) => [...prev, { role: 'image', imageUrl: url, content: `Image-to-image result for: ${input}` }]);
         } else {
           setError(data.error || 'No image returned.');
         }

@@ -123,8 +123,18 @@ app.post('/image-to-image', upload.single('init_image'), async (req, res) => {
     console.log('Modelslab response:', JSON.stringify(mlRes.data));
     const data = mlRes.data;
     let resultImageUrl = null;
-    if (data && Array.isArray(data.init_image) && data.init_image.length > 0) {
-      resultImageUrl = data.init_image[0];
+    if (data) {
+      if (Array.isArray(data.init_image) && data.init_image.length > 0) {
+        resultImageUrl = data.init_image[0];
+      } else if (typeof data.init_image === 'string') {
+        resultImageUrl = data.init_image;
+      } else if (data.image_url) {
+        resultImageUrl = data.image_url;
+      } else if (data.image) {
+        resultImageUrl = data.image;
+      } else if (Array.isArray(data.output) && data.output.length > 0) {
+        resultImageUrl = data.output[0];
+      }
     }
     if (resultImageUrl) {
       res.json({ imageUrl: resultImageUrl });
