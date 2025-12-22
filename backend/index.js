@@ -112,7 +112,7 @@ app.post('/image-to-image', upload.single('init_image'), async (req, res) => {
       {
         headers: {
           ...form.getHeaders(),
-          'api_key': process.env.MODELSLAB_API_KEY
+          'api_key': 'Cp790n9sL087P3wLcxo6aJPVUifFPE7pPxVlnNO9K6QKlekEut7YMjBsCqv2'
         }
       }
     );
