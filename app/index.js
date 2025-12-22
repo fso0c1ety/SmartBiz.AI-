@@ -31,13 +31,13 @@ export default function App() {
         let localUri = selectedImage.uri;
         let filename = localUri.split('/').pop();
         let match = /\.([^.]+)$/.exec(filename);
-        let type = match ? `image/${match[1]}` : `image`;
+        let type = match && match[1].toLowerCase() === 'png' ? 'image/png' : 'image/jpeg';
+        if (!localUri.startsWith('file://')) localUri = 'file://' + localUri;
         let formData = new FormData();
-        formData.append('image', { uri: localUri, name: filename, type });
+        formData.append('init_image', { uri: localUri, name: filename, type });
         formData.append('prompt', input);
-        const res = await fetch(IMAGE2IMAGE_URL, {
+        const res = await fetch('http://localhost:8080/image-to-image', {
           method: 'POST',
-          headers: { 'Content-Type': 'multipart/form-data' },
           body: formData
         });
         const data = await res.json();
