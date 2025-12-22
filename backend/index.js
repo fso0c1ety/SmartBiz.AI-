@@ -83,7 +83,8 @@ app.post('/image-to-image', upload.single('image'), async (req, res) => {
       }
     );
     fs.unlinkSync(req.file.path);
-    // Extract the first image URL from the response (init_image array)
+    // Log the full response for debugging
+    console.log('Modelslab response:', JSON.stringify(mlRes.data));
     const data = mlRes.data;
     let imageUrl = null;
     if (data && Array.isArray(data.init_image) && data.init_image.length > 0) {
@@ -92,7 +93,7 @@ app.post('/image-to-image', upload.single('image'), async (req, res) => {
     if (imageUrl) {
       res.json({ imageUrl });
     } else {
-      res.status(500).json({ error: 'No image returned from Modelslab.' });
+      res.status(500).json({ error: 'No image returned from Modelslab.', modelslab: data });
     }
   } catch (err) {
     if (req.file) fs.unlinkSync(req.file.path);
