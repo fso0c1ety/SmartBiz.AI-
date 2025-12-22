@@ -99,23 +99,23 @@ app.post('/image-to-image', upload.single('init_image'), async (req, res) => {
     if (!imageUrl) {
       return res.status(500).json({ error: 'Failed to upload image to Cloudinary.' });
     }
-    // Send Cloudinary URL to Modelslab
-    const form = new FormData();
-    form.append('prompt', prompt);
-    form.append('init_image', imageUrl); // Send as URL
-    form.append('model_id', 'seedream-4.5-i2i');
-    form.append('aspect-ratio', '1:1');
-    // Send JSON body to Modelslab, as in working example
+    // Send full set of fields from working example
     const mlRes = await axios.post(
       'https://modelslab.com/api/v7/images/image-to-image',
       {
         key: 'Cp790n9sL087P3wLcxo6aJPVUifFPE7pPxVlnNO9K6QKlekEut7YMjBsCqv2',
-        api_key: 'Cp790n9sL087P3wLcxo6aJPVUifFPE7pPxVlnNO9K6QKlekEut7YMjBsCqv2',
         model_id: 'seedream-4.5-i2i',
-        prompt,
+        prompt: `\nPlace the SAME product into a new scene.\nPreserve shape, label, and branding as closely as possible.\nProfessional product photography.\n${prompt}\n`.trim(),
         init_image: imageUrl,
-        aspect_ratio: '1:1'
-        // add other params as needed
+        width: '1024',
+        height: '1024',
+        samples: '1',
+        num_inference_steps: '30',
+        guidance_scale: 6.5,
+        strength: 0.5,
+        enhance_prompt: 'yes',
+        safety_checker: 'no',
+        base64: 'no'
       },
       { headers: { 'Content-Type': 'application/json' } }
     );
