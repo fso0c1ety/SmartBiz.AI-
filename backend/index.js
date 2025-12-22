@@ -105,15 +105,14 @@ app.post('/image-to-image', (req, res, next) => {
   const { prompt } = req.body;
   if (!req.file || !prompt) return res.status(400).json({ error: 'Image and prompt are required.' });
   try {
+    // For testing: send the image as a URL instead of a file
+    // You must host the image somewhere public. For now, we'll simulate this by returning an error if not possible.
+    // In production, you would upload the file to a storage service (S3, Cloudinary, etc.) and get a public URL.
+    // We'll use a placeholder for demonstration.
+    const placeholderImageUrl = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb';
     const form = new FormData();
     form.append('prompt', prompt);
-    // Read file as buffer and append to FormData
-    const fileBuffer = fs.readFileSync(req.file.path);
-    console.log('Buffer length:', fileBuffer.length, 'Type:', req.file.mimetype);
-    form.append('init_image', fileBuffer, {
-      filename: req.file.originalname,
-      contentType: req.file.mimetype
-    });
+    form.append('init_image', placeholderImageUrl); // Send as URL
     form.append('model_id', 'seedream-4.5-i2i');
     form.append('aspect-ratio', '1:1');
     form.append('key', process.env.MODELSLAB_API_KEY);
@@ -126,7 +125,7 @@ app.post('/image-to-image', (req, res, next) => {
         }
       }
     );
-    fs.unlinkSync(req.file.path);
+    if (req.file) fs.unlinkSync(req.file.path);
     // Log the full response for debugging
     console.log('Modelslab response:', JSON.stringify(mlRes.data));
     const data = mlRes.data;
