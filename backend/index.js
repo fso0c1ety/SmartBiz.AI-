@@ -90,17 +90,7 @@ app.post('/image-to-image', upload.single('image'), async (req, res) => {
   }
 });
 
-import dotenv from 'dotenv';
-import express from 'express';
-import cors from 'cors';
-import axios from 'axios';
-dotenv.config();
-
-const app = express();
-const port = process.env.PORT || 8080;
-
-app.use(cors());
-app.use(express.json());
+// (duplicate block removed)
 
 // POST /chat - expects { message: "..." }
 app.post('/chat', async (req, res) => {
