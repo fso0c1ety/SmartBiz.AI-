@@ -162,7 +162,7 @@ app.post('/chat', async (req, res) => {
       {
         model: 'gpt-4-1106-preview',
         messages: [
-          { role: 'system', content: 'You are a helpful assistant.' },
+          { role: 'system', content: 'You are SmartBiz.AI, an expert business assistant. Always introduce yourself as SmartBiz.AI and never mention OpenAI or GPT-4.' },
           { role: 'user', content: message }
         ]
       },

@@ -1,11 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Image, Alert } from 'react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Image, Alert, Modal } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { downloadAsync } from 'expo-file-system/legacy';
+import * as FileSystem from 'expo-file-system';
 
 export default function App() {
+    const [modalVisible, setModalVisible] = useState(false);
+    const [modalImageUrl, setModalImageUrl] = useState(null);
+    const handleImagePress = (url) => {
+      setModalImageUrl(url);
+      setModalVisible(true);
+    };
+    const handleDownloadImage = async () => {
+      if (!modalImageUrl) return;
+      try {
+        const fileUri = `${FileSystem.documentDirectory}${Date.now()}.jpg`;
+        const result = await downloadAsync(modalImageUrl, fileUri);
+        Alert.alert('Image saved!', `Saved to: ${result.uri}`);
+      } catch (e) {
+        Alert.alert('Download failed', e.message);
+      }
+    };
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([
     { role: 'system', content: 'Hello this is SmartBiz.ai' }
@@ -159,7 +177,9 @@ export default function App() {
               >
                 {msg.role === 'image' ? (
                   <>
-                    <Image source={{ uri: msg.imageUrl }} style={{ width: 220, height: 220, borderRadius: 16, marginBottom: 8 }} resizeMode="cover" />
+                    <TouchableOpacity onPress={() => handleImagePress(msg.imageUrl)}>
+                      <Image source={{ uri: msg.imageUrl }} style={{ width: 220, height: 220, borderRadius: 16, marginBottom: 8 }} resizeMode="cover" />
+                    </TouchableOpacity>
                     <Text style={styles.answerText}>{msg.content}</Text>
                   </>
                 ) : msg.role === 'assistant' || msg.role === 'system' ? (
@@ -170,7 +190,7 @@ export default function App() {
                     <Text style={styles.answerText}>{msg.content}</Text>
                   </>
                 ) : (
-                  <Text style={styles.questionText}>{msg.content}</Text>
+                  <Text style={styles.answerText}>{msg.content}</Text>
                 )}
               </View>
             ))}
@@ -186,6 +206,19 @@ export default function App() {
               <Text style={{ color: 'red', marginTop: 10 }}>{error}</Text>
             ) : null}
           </ScrollView>
+          <Modal visible={modalVisible} transparent animationType="fade">
+            <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' }}>
+              <TouchableOpacity style={{ position: 'absolute', top: 40, right: 20 }} onPress={() => setModalVisible(false)}>
+                <Ionicons name="close-circle" size={40} color="#fff" />
+              </TouchableOpacity>
+              {modalImageUrl && (
+                <Image source={{ uri: modalImageUrl }} style={{ width: '90%', height: '70%', borderRadius: 20 }} resizeMode="contain" />
+              )}
+              <TouchableOpacity style={{ marginTop: 24, backgroundColor: '#FFD700', padding: 12, borderRadius: 10 }} onPress={handleDownloadImage}>
+                <Text style={{ color: '#222', fontWeight: 'bold' }}>Download Image</Text>
+              </TouchableOpacity>
+            </View>
+          </Modal>
         </View>
         <View style={styles.inputBar}>
           <TextInput
