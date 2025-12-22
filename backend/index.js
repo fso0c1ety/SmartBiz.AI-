@@ -10,7 +10,16 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 8080;
 
-const upload = multer({ dest: 'uploads/' });
+const upload = multer({
+  dest: 'uploads/',
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed!'), false);
+    }
+  }
+});
 
 app.use(cors());
 app.use(express.json());
@@ -65,13 +74,44 @@ app.post('/image-to-text', upload.single('image'), async (req, res) => {
 });
 
 // 3. Image to image (Modelslab)
-app.post('/image-to-image', upload.single('image'), async (req, res) => {
+app.post('/image-to-image', (req, res, next) => {
+  // Accept both 'image' and 'init_image' fields for compatibility
+  const multiUpload = multer({
+    dest: 'uploads/',
+    fileFilter: (req, file, cb) => {
+      if (file.mimetype.startsWith('image/')) {
+        cb(null, true);
+      } else {
+        cb(new Error('Only image files are allowed!'), false);
+      }
+    }
+  }).single('init_image');
+  multiUpload(req, res, function (err) {
+    if (err) {
+      return res.status(400).json({ error: err.message });
+    }
+    next();
+  });
+}, async (req, res) => {
+  // Log file info for debugging
+  if (req.file) {
+    console.log('Uploaded file:', {
+      originalname: req.file.originalname,
+      mimetype: req.file.mimetype,
+      path: req.file.path,
+      size: req.file.size
+    });
+  }
   const { prompt } = req.body;
   if (!req.file || !prompt) return res.status(400).json({ error: 'Image and prompt are required.' });
   try {
     const form = new FormData();
     form.append('prompt', prompt);
-    form.append('init_image', fs.createReadStream(req.file.path));
+    // Set correct filename and mimetype in FormData
+    form.append('init_image', fs.createReadStream(req.file.path), {
+      filename: req.file.originalname,
+      contentType: req.file.mimetype
+    });
     form.append('model_id', 'seedream-4.5-i2i');
     form.append('aspect-ratio', '1:1');
     form.append('key', process.env.MODELSLAB_API_KEY);
