@@ -72,7 +72,6 @@ app.post('/image-to-image', upload.single('image'), async (req, res) => {
     const form = new FormData();
     form.append('prompt', prompt);
     form.append('image', fs.createReadStream(req.file.path));
-    // You may need to add your Modelslab API key as a header if required
     const mlRes = await axios.post(
       'https://modelslab.com/api/v7/images/image-to-image',
       form,
@@ -84,7 +83,17 @@ app.post('/image-to-image', upload.single('image'), async (req, res) => {
       }
     );
     fs.unlinkSync(req.file.path);
-    res.json(mlRes.data);
+    // Extract the first image URL from the response (init_image array)
+    const data = mlRes.data;
+    let imageUrl = null;
+    if (data && Array.isArray(data.init_image) && data.init_image.length > 0) {
+      imageUrl = data.init_image[0];
+    }
+    if (imageUrl) {
+      res.json({ imageUrl });
+    } else {
+      res.status(500).json({ error: 'No image returned from Modelslab.' });
+    }
   } catch (err) {
     if (req.file) fs.unlinkSync(req.file.path);
     res.status(500).json({ error: 'Failed to generate image-to-image.' });
