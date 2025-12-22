@@ -105,7 +105,7 @@ app.post('/image-to-image', upload.single('init_image'), async (req, res) => {
     form.append('init_image', imageUrl); // Send as URL
     form.append('model_id', 'seedream-4.5-i2i');
     form.append('aspect-ratio', '1:1');
-    form.append('key', process.env.MODELSLAB_API_KEY);
+    form.append('api_key', process.env.MODELSLAB_API_KEY);
     const mlRes = await axios.post(
       'https://modelslab.com/api/v7/images/image-to-image',
       form,
