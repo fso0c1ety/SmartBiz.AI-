@@ -7,6 +7,8 @@ import axios from 'axios';
 import dotenv from 'dotenv';
 dotenv.config();
 
+import cloudinary from './cloudinary.js';
+
 const app = express();
 const port = process.env.PORT || 8080;
 
@@ -93,55 +95,75 @@ app.post('/image-to-image', (req, res, next) => {
     next();
   });
 }, async (req, res) => {
-  // Log file info for debugging
-  if (req.file) {
-    console.log('Uploaded file:', {
-      originalname: req.file.originalname,
-      mimetype: req.file.mimetype,
-      path: req.file.path,
-      size: req.file.size
-    });
-  }
-  const { prompt } = req.body;
-  if (!req.file || !prompt) return res.status(400).json({ error: 'Image and prompt are required.' });
-  try {
-    // For testing: send the image as a URL instead of a file
-    // You must host the image somewhere public. For now, we'll simulate this by returning an error if not possible.
-    // In production, you would upload the file to a storage service (S3, Cloudinary, etc.) and get a public URL.
-    // We'll use a placeholder for demonstration.
-    const placeholderImageUrl = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb';
-    const form = new FormData();
-    form.append('prompt', prompt);
-    form.append('init_image', placeholderImageUrl); // Send as URL
-    form.append('model_id', 'seedream-4.5-i2i');
-    form.append('aspect-ratio', '1:1');
-    form.append('key', process.env.MODELSLAB_API_KEY);
-    const mlRes = await axios.post(
-      'https://modelslab.com/api/v7/images/image-to-image',
-      form,
-      {
-        headers: {
-          ...form.getHeaders()
-        }
+  const multiUpload = multer({
+    dest: 'uploads/',
+    fileFilter: (req, file, cb) => {
+      if (file.mimetype.startsWith('image/')) {
+        cb(null, true);
+      } else {
+        cb(new Error('Only image files are allowed!'), false);
       }
-    );
-    if (req.file) fs.unlinkSync(req.file.path);
-    // Log the full response for debugging
-    console.log('Modelslab response:', JSON.stringify(mlRes.data));
-    const data = mlRes.data;
-    let imageUrl = null;
-    if (data && Array.isArray(data.init_image) && data.init_image.length > 0) {
-      imageUrl = data.init_image[0];
     }
-    if (imageUrl) {
-      res.json({ imageUrl });
-    } else {
-      res.status(500).json({ error: 'No image returned from Modelslab.', modelslab: data });
+  }).single('init_image');
+  multiUpload(req, res, async function (err) {
+    if (err) {
+      return res.status(400).json({ error: err.message });
     }
-  } catch (err) {
-    if (req.file) fs.unlinkSync(req.file.path);
-    res.status(500).json({ error: 'Failed to generate image-to-image.' });
-  }
+    // Log file info for debugging
+    if (req.file) {
+      console.log('Uploaded file:', {
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+        path: req.file.path,
+        size: req.file.size
+      });
+    }
+    const { prompt } = req.body;
+    if (!req.file || !prompt) return res.status(400).json({ error: 'Image and prompt are required.' });
+    try {
+      // Upload image to Cloudinary
+      const uploadResult = await cloudinary.v2.uploader.upload(req.file.path, {
+        folder: 'smartbizai',
+        resource_type: 'image',
+      });
+      if (req.file) fs.unlinkSync(req.file.path);
+      const imageUrl = uploadResult.secure_url;
+      if (!imageUrl) {
+        return res.status(500).json({ error: 'Failed to upload image to Cloudinary.' });
+      }
+      // Send Cloudinary URL to Modelslab
+      const form = new FormData();
+      form.append('prompt', prompt);
+      form.append('init_image', imageUrl); // Send as URL
+      form.append('model_id', 'seedream-4.5-i2i');
+      form.append('aspect-ratio', '1:1');
+      form.append('key', process.env.MODELSLAB_API_KEY);
+      const mlRes = await axios.post(
+        'https://modelslab.com/api/v7/images/image-to-image',
+        form,
+        {
+          headers: {
+            ...form.getHeaders()
+          }
+        }
+      );
+      // Log the full response for debugging
+      console.log('Modelslab response:', JSON.stringify(mlRes.data));
+      const data = mlRes.data;
+      let resultImageUrl = null;
+      if (data && Array.isArray(data.init_image) && data.init_image.length > 0) {
+        resultImageUrl = data.init_image[0];
+      }
+      if (resultImageUrl) {
+        res.json({ imageUrl: resultImageUrl });
+      } else {
+        res.status(500).json({ error: 'No image returned from Modelslab.', modelslab: data });
+      }
+    } catch (err) {
+      if (req.file) fs.unlinkSync(req.file.path);
+      res.status(500).json({ error: 'Failed to generate image-to-image.' });
+    }
+  });
 });
 
 // (duplicate block removed)
