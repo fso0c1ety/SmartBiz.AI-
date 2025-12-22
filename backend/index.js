@@ -107,8 +107,10 @@ app.post('/image-to-image', (req, res, next) => {
   try {
     const form = new FormData();
     form.append('prompt', prompt);
-    // Set correct filename and mimetype in FormData
-    form.append('init_image', fs.createReadStream(req.file.path), {
+    // Read file as buffer and append to FormData
+    const fileBuffer = fs.readFileSync(req.file.path);
+    console.log('Buffer length:', fileBuffer.length, 'Type:', req.file.mimetype);
+    form.append('init_image', fileBuffer, {
       filename: req.file.originalname,
       contentType: req.file.mimetype
     });
