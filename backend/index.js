@@ -18,7 +18,7 @@ app.use(express.json());
 app.post('/generate-image', async (req, res) => {
   const { prompt } = req.body;
   if (!prompt) return res.status(400).json({ error: 'Prompt is required.' });
-const port = process.env.PORT || 8080; // Keep this line
+  try {
     // Pollinations API: https://image.pollinations.ai/prompt/{prompt}
     const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}`;
     res.json({ imageUrl });
