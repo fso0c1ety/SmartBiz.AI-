@@ -1,7 +1,20 @@
 import multer from 'multer';
 import FormData from 'form-data';
 import fs from 'fs';
+import dotenv from 'dotenv';
+import express from 'express';
+import cors from 'cors';
+import axios from 'axios';
+dotenv.config();
+
+const app = express();
+const port = process.env.PORT || 8080;
+
 const upload = multer({ dest: 'uploads/' });
+
+app.use(cors());
+app.use(express.json());
+
 // 1. Generate image with Pollinations
 app.post('/generate-image', async (req, res) => {
   const { prompt } = req.body;
