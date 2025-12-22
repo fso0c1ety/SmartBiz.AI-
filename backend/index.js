@@ -153,19 +153,20 @@ app.post('/image-to-image', upload.single('init_image'), async (req, res) => {
 
 // POST /chat - expects { message: "..." }
 app.post('/chat', async (req, res) => {
-  const { message } = req.body;
-  if (!message) {
-    return res.status(400).json({ error: 'Message is required.' });
+  const { messages } = req.body;
+  if (!messages || !Array.isArray(messages) || messages.length === 0) {
+    return res.status(400).json({ error: 'Messages array is required.' });
   }
   try {
+    // Always prepend system prompt
+    const systemPrompt = { role: 'system', content: 'You are SmartBiz.AI, an expert business assistant. Always introduce yourself as SmartBiz.AI and never mention OpenAI or GPT-4.' };
+    // Filter out images and system messages from user history
+    const filteredMessages = messages.filter(m => m.role === 'user' || m.role === 'assistant').map(m => ({ role: m.role, content: m.content }));
     const openaiRes = await axios.post(
       'https://api.openai.com/v1/chat/completions',
       {
         model: 'gpt-4-1106-preview',
-        messages: [
-          { role: 'system', content: 'You are SmartBiz.AI, an expert business assistant. Always introduce yourself as SmartBiz.AI and never mention OpenAI or GPT-4.' },
-          { role: 'user', content: message }
-        ]
+        messages: [systemPrompt, ...filteredMessages]
       },
       {
         headers: {

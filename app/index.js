@@ -144,12 +144,13 @@ export default function App() {
     }
     // Otherwise, normal chat
     const userMsg = { role: 'user', content: input };
-    setMessages((prev) => [...prev, userMsg]);
+    const updatedMessages = [...messages, userMsg];
+    setMessages(updatedMessages);
     try {
       const res = await fetch(BACKEND_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: input })
+        body: JSON.stringify({ messages: updatedMessages })
       });
       const data = await res.json();
       if (data.reply) {
