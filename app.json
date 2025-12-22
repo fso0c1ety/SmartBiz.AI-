@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "SmartBizAI2",
-    "slug": "SmartBizAI2",
+    "name": "SmartBiz.AI",
+    "slug": "SmartBizAI",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
