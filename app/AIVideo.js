@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform, Image } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
@@ -12,8 +13,28 @@ export default function AIVideo() {
   const [error, setError] = useState("");
   const [messages, setMessages] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
+  const [persistedImageUrl, setPersistedImageUrl] = useState(null);
 
-  const handleGenerate = async () => {
+  // Resume pending generation on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const url = await AsyncStorage.getItem('lastGeneratedImageUrl');
+        if (url) setPersistedImageUrl(url);
+        const pending = await AsyncStorage.getItem('pendingGeneration');
+        if (pending) {
+          const { prompt, selectedImage, type } = JSON.parse(pending);
+          setPrompt(prompt);
+          if (selectedImage) setSelectedImage(selectedImage);
+          setTimeout(() => handleGenerate(true), 500); // resume after short delay
+        }
+      } catch (e) {
+        console.log('Failed to load persisted image URL or pending gen:', e);
+      }
+    })();
+  }, []);
+
+  const handleGenerate = async (isResume = false) => {
     if ((!prompt.trim() && !selectedImage) || loading) return;
     setLoading(true);
     setError("");
@@ -21,11 +42,22 @@ export default function AIVideo() {
       ...prev,
       { role: 'user', content: prompt, image: selectedImage?.uri }
     ]);
+    // Save pending generation state
+    if (!isResume) {
+      try {
+        await AsyncStorage.setItem('pendingGeneration', JSON.stringify({
+          prompt,
+          selectedImage,
+          type: selectedImage ? 'image-to-video' : (/generate an? image of|draw|create an? image of|make an? image of|picture of|image of|photo of/i.test(prompt) ? 'text-to-image' : null)
+        }));
+      } catch (e) { console.log('Failed to persist pending gen:', e); }
+    }
+    // 1. If image is selected, always use image-to-video
     try {
-      let durationMatch = prompt.match(/(\d+)\s*s\s*video/i);
-      let duration = durationMatch ? parseInt(durationMatch[1]) : 5;
       if (selectedImage) {
-        // Image-to-video: upload to backend, then call video API
+        let durationMatch = prompt.match(/(\d+)\s*s\s*video/i);
+        let duration = durationMatch ? parseInt(durationMatch[1]) : 5;
+        const apiKey = "Cp790n9sL087P3wLcxo6aJPVUifFPE7pPxVlnNO9K6QKlekEut7YMjBsCqv2";
         let formData = new FormData();
         let localUri = selectedImage.uri;
         let filename = localUri.split('/').pop();
@@ -34,15 +66,24 @@ export default function AIVideo() {
         if (!localUri.startsWith('file://')) localUri = 'file://' + localUri;
         formData.append('init_image', { uri: localUri, name: filename, type });
         formData.append('prompt', prompt);
-        formData.append('duration', duration);
+        formData.append('duration', String(duration));
+        formData.append('key', apiKey);
         try {
           const response = await fetch('https://kujto-ai.onrender.com/image-to-video', {
             method: 'POST',
-            body: formData
+            body: formData // Do NOT set headers, let fetch handle it
           });
           const data = await response.json();
           console.log('Backend image-to-video response:', data);
           if (data.status === 'success' && data.data && data.data.id) {
+            // Persist the image used for image-to-video
+            try {
+              await AsyncStorage.setItem('lastGeneratedImageUrl', data.data.input_image || localUri);
+              setPersistedImageUrl(data.data.input_image || localUri);
+              await AsyncStorage.removeItem('pendingGeneration');
+            } catch (e) {
+              console.log('Failed to persist image-to-video image URL:', e);
+            }
             setPrompt("");
             setSelectedImage(null);
             setLoading(false);
@@ -52,6 +93,7 @@ export default function AIVideo() {
             });
             return;
           } else if (data.status === 'processing' && data.fetch_result) {
+            await AsyncStorage.removeItem('pendingGeneration');
             setPrompt("");
             setLoading(false);
             router.push({
@@ -59,18 +101,30 @@ export default function AIVideo() {
               params: {
                 prompt,
                 fetchResultUrl: data.fetch_result,
+                apiKey,
                 duration
               }
             });
             return;
           } else {
+            await AsyncStorage.removeItem('pendingGeneration');
             setError((data.message || data.error || 'Failed to start image-to-video generation.'));
+            alert('Image-to-video error: ' + (data.message || data.error || 'Failed to start image-to-video generation.'));
           }
         } catch (err) {
+          await AsyncStorage.removeItem('pendingGeneration');
           setError('Network or fetch error: ' + err.message);
+          alert('Image-to-video network error.');
         }
-      } else {
-        // Text-to-video
+        setPrompt("");
+        setLoading(false);
+        return;
+      }
+      // 2. If only text and prompt contains 'video', use text-to-video
+      if (!selectedImage && /video/i.test(prompt)) {
+        let durationMatch = prompt.match(/(\d+)\s*s\s*video/i);
+        let duration = durationMatch ? parseInt(durationMatch[1]) : 5;
+        const apiKey = "Cp790n9sL087P3wLcxo6aJPVUifFPE7pPxVlnNO9K6QKlekEut7YMjBsCqv2";
         const payload = {
           prompt: prompt.trim(),
           model_id: "seedance-1-5-pro",
@@ -78,40 +132,98 @@ export default function AIVideo() {
           duration,
           key: apiKey
         };
-        const response = await fetch("https://modelslab.com/api/v7/video-fusion/text-to-video", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-        const data = await response.json();
-        let url = data.video_url || data.videoUrl || data.url;
-        if (url) {
-          setMessages(prev => [
-            ...prev,
-            { role: 'video', videoUrl: url, content: `Generated video for: ${prompt}` }
-          ]);
-        } else if (data.status === 'processing' && data.fetch_result) {
-          setPrompt("");
-          setLoading(false);
-          router.push({
-            pathname: '/VideoLoading',
-            params: {
-              prompt,
-              fetchResultUrl: data.fetch_result,
-              apiKey,
-              duration
-            }
+        try {
+          const response = await fetch("https://modelslab.com/api/v7/video-fusion/text-to-video", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
           });
-        } else {
-          setError((data.error && typeof data.error === 'string') ? data.error : JSON.stringify(data));
+          const data = await response.json();
+          console.log('Text-to-video response:', data);
+          if (data.video_url || data.videoUrl || data.url) {
+            let url = data.video_url || data.videoUrl || data.url;
+            setMessages(prev => [
+              ...prev,
+              { role: 'video', videoUrl: url, content: `Generated video for: ${prompt}` }
+            ]);
+          } else if (data.status === 'processing' && data.fetch_result) {
+            setPrompt("");
+            setLoading(false);
+            router.push({
+              pathname: '/VideoLoading',
+              params: {
+                prompt,
+                fetchResultUrl: data.fetch_result,
+                apiKey,
+                duration
+              }
+            });
+          } else {
+            setError((data.error && typeof data.error === 'string') ? data.error : JSON.stringify(data));
+            alert('Text-to-video error: ' + ((data.error && typeof data.error === 'string') ? data.error : JSON.stringify(data)));
+          }
+        } catch (err) {
+          setError('Network error.');
+          alert('Text-to-video network error.');
         }
+        setPrompt("");
+        setLoading(false);
+        return;
+      }
+      // 3. If only text and prompt is for image, use text-to-image
+      if (!selectedImage && /generate an? image of|draw|create an? image of|make an? image of|picture of|image of|photo of/i.test(prompt)) {
+        try {
+          const res = await fetch('https://kujto-ai.onrender.com/generate-image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt })
+          });
+          const data = await res.json();
+          console.log('Text-to-image response:', data);
+          if (data.imageUrl) {
+            setMessages(prev => [...prev, { role: 'image', imageUrl: data.imageUrl, content: `Generated image for: ${prompt}` }]);
+            try {
+              await AsyncStorage.setItem('lastGeneratedImageUrl', data.imageUrl);
+              setPersistedImageUrl(data.imageUrl);
+              await AsyncStorage.removeItem('pendingGeneration');
+            } catch (e) {
+              console.log('Failed to persist image URL:', e);
+            }
+          } else {
+            await AsyncStorage.removeItem('pendingGeneration');
+            setError(data.error || 'No image generated.');
+            alert('Text-to-image error: ' + (data.error || 'No image generated.'));
+          }
+        } catch (err) {
+          await AsyncStorage.removeItem('pendingGeneration');
+          setError('Network error.');
+          alert('Text-to-image network error.');
+        }
+        setPrompt("");
+        setLoading(false);
+        return;
+      }
+      // Fallback log for all handleGenerate branches
+      if (!selectedImage && !/generate an? image of|draw|create an? image of|make an? image of|picture of|image of|photo of|video/i.test(prompt)) {
+        console.log('Prompt did not match any handler:', prompt);
       }
     } catch (e) {
-      setError("Error generating video.");
+      setError('Error generating video: ' + (e?.message || e));
+      setLoading(false);
     }
-    setPrompt("");
-    setLoading(false);
   };
+
+  // Load persisted image on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const url = await AsyncStorage.getItem('lastGeneratedImageUrl');
+        if (url) setPersistedImageUrl(url);
+      } catch (e) {
+        console.log('Failed to load persisted image URL:', e);
+      }
+    })();
+  }, []);
 
   const handlePickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
@@ -233,6 +345,13 @@ export default function AIVideo() {
                 <Ionicons name="close" size={18} color="#fff" />
               </TouchableOpacity>
               <Text style={{ color: '#fff', marginLeft: 8 }}>Image selected</Text>
+            </View>
+          )}
+          {/* Persisted image display */}
+          {persistedImageUrl && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, marginLeft: 8 }}>
+              <Image source={{ uri: persistedImageUrl }} style={{ width: 60, height: 60, borderRadius: 10, marginRight: 8, borderWidth: 2, borderColor: '#FFD700' }} />
+              <Text style={{ color: '#FFD700', marginLeft: 8 }}>Last generated image</Text>
             </View>
           )}
           {/* Show messages like chat bubbles */}

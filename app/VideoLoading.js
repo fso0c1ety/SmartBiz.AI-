@@ -35,7 +35,6 @@ export default function VideoLoading() {
     let interval;
 
     if (!fetchResultUrl) {
-      setError('No polling URL provided by the API. Video generation cannot continue.');
       setLoading(false);
       return;
     }
@@ -45,18 +44,12 @@ export default function VideoLoading() {
         await new Promise(res => setTimeout(res, pollDelay));
         setProgress(Math.min(100, Math.round(((pollCount + 1) / maxPolls) * 100)));
         try {
-          // Try GET first (most polling endpoints use GET)
-          let pollRes = await fetch(fetchResultUrl + (typeof fetchResultUrl === 'string' && fetchResultUrl.includes('?') ? '&' : '?') + 'key=' + encodeURIComponent(apiKey), {
-            method: 'GET',
+          // Always use POST for Modelslab video fetch endpoint
+          let pollRes = await fetch(fetchResultUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key: apiKey })
           });
-          if (!pollRes.ok) {
-            // fallback to POST if GET fails
-            pollRes = await fetch(fetchResultUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ key: apiKey })
-            });
-          }
           const pollData = await pollRes.json();
           let pollUrl = pollData.video_url || pollData.videoUrl || pollData.url || (pollData.output && pollData.output[0]);
           if (pollUrl) {
