@@ -77,6 +77,53 @@ app.post('/image-to-text', upload.single('image'), async (req, res) => {
 });
 
 // 3. Image to image (Modelslab)
+app.post('/image-to-video', upload.single('init_image'), async (req, res) => {
+  // Log file info for debugging
+  if (req.file) {
+    console.log('Uploaded file:', {
+      originalname: req.file.originalname,
+      mimetype: req.file.mimetype,
+      path: req.file.path,
+      size: req.file.size
+    });
+  }
+  const { prompt, duration } = req.body;
+  if (!req.file || !prompt) return res.status(400).json({ error: 'Image and prompt are required.' });
+  try {
+    // Upload image to Cloudinary
+    const uploadResult = await cloudinary.v2.uploader.upload(req.file.path, {
+      folder: 'smartbizai',
+      resource_type: 'image',
+    });
+    if (req.file) fs.unlinkSync(req.file.path);
+    const imageUrl = uploadResult.secure_url;
+    if (!imageUrl) {
+      return res.status(500).json({ error: 'Failed to upload image to Cloudinary.' });
+    }
+    // Call Modelslab image-to-video API
+    const mlRes = await axios.post(
+      'https://modelslab.com/api/v7/video-fusion/image-to-video',
+      {
+        key: 'Cp790n9sL087P3wLcxo6aJPVUifFPE7pPxVlnNO9K6QKlekEut7YMjBsCqv2',
+        model_id: 'seedance-1-5-pro',
+        prompt: prompt.trim(),
+        aspect_ratio: '9:16',
+        duration: duration || 5,
+        init_image: [imageUrl],
+      },
+      { headers: { 'Content-Type': 'application/json' } }
+    );
+    // Log the full response for debugging
+    console.log('Modelslab image-to-video response:', JSON.stringify(mlRes.data));
+    const data = mlRes.data;
+    res.json(data);
+  } catch (err) {
+    if (req.file) fs.unlinkSync(req.file.path);
+    console.error('Modelslab image-to-video error:', err?.response?.data || err.message || err);
+    res.status(500).json({ error: 'Failed to generate image-to-video.', details: err?.response?.data || err.message || err });
+  }
+});
+
 app.post('/image-to-image', upload.single('init_image'), async (req, res) => {
   // Log file info for debugging
   if (req.file) {
