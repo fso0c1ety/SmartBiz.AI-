@@ -218,6 +218,16 @@ app.get('/chat-history', async (req, res) => {
   }
 });
 
+// Debug endpoint: get all chat messages (no user filter)
+app.get('/debug-chat-messages', async (req, res) => {
+  try {
+    const { rows } = await import('./db.js').then(db => db.default.query('SELECT * FROM chat_messages ORDER BY created_at ASC'));
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch all chat messages.', details: err.message });
+  }
+});
+
 // Save video history
 app.post('/video-history', async (req, res) => {
   const { video_url, description } = req.body;
