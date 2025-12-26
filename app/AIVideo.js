@@ -16,20 +16,21 @@ export default function AIVideo() {
   const [persistedImageUrl, setPersistedImageUrl] = useState(null);
 
   // Resume pending generation on mount
+  // Fetch video history from backend on mount
   useEffect(() => {
     (async () => {
       try {
-        const url = await AsyncStorage.getItem('lastGeneratedImageUrl');
-        if (url) setPersistedImageUrl(url);
-        const pending = await AsyncStorage.getItem('pendingGeneration');
-        if (pending) {
-          const { prompt, selectedImage, type } = JSON.parse(pending);
-          setPrompt(prompt);
-          if (selectedImage) setSelectedImage(selectedImage);
-          setTimeout(() => handleGenerate(true), 500); // resume after short delay
+        const res = await fetch('https://kujto-ai.onrender.com/video-history', {
+          method: 'GET',
+        });
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setMessages(data);
+        } else if (Array.isArray(data.messages)) {
+          setMessages(data.messages);
         }
       } catch (e) {
-        console.log('Failed to load persisted image URL or pending gen:', e);
+        setMessages([]);
       }
     })();
   }, []);
@@ -42,15 +43,15 @@ export default function AIVideo() {
       ...prev,
       { role: 'user', content: prompt, image: selectedImage?.uri }
     ]);
-    // Save pending generation state
+    // Save video history to backend
     if (!isResume) {
       try {
-        await AsyncStorage.setItem('pendingGeneration', JSON.stringify({
-          prompt,
-          selectedImage,
-          type: selectedImage ? 'image-to-video' : (/generate an? image of|draw|create an? image of|make an? image of|picture of|image of|photo of/i.test(prompt) ? 'text-to-image' : null)
-        }));
-      } catch (e) { console.log('Failed to persist pending gen:', e); }
+        await fetch('https://kujto-ai.onrender.com/video-history', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages: [...messages, { role: 'user', content: prompt, image: selectedImage?.uri }] })
+        });
+      } catch (e) { console.log('Failed to persist video history:', e); }
     }
     // 1. If image is selected, always use image-to-video
     try {

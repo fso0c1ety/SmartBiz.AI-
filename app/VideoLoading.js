@@ -16,13 +16,22 @@ export default function VideoLoading() {
   const [modalVisible, setModalVisible] = useState(false);
   const [modalVideoUrl, setModalVideoUrl] = useState(null);
 
-  // Load all generated videos from AsyncStorage
+  // Load all generated videos from backend video-history API
   useEffect(() => {
     (async () => {
       try {
-        const saved = await AsyncStorage.getItem('generated_videos');
-        if (saved) setVideos(JSON.parse(saved));
-      } catch (e) {}
+        const res = await fetch('https://kujto-ai.onrender.com/video-history', {
+          method: 'GET',
+        });
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setVideos(data);
+        } else if (Array.isArray(data.messages)) {
+          setVideos(data.messages);
+        }
+      } catch (e) {
+        setVideos([]);
+      }
     })();
   }, []);
 
@@ -56,13 +65,16 @@ export default function VideoLoading() {
             setVideoUrl(pollUrl);
             setLoading(false);
             finished = true;
-            // Save to AsyncStorage
+            // Save to backend video-history
             const newVideo = { url: pollUrl, prompt, duration, created: Date.now() };
-            setVideos(prev => {
-              const updated = [newVideo, ...prev];
-              AsyncStorage.setItem('generated_videos', JSON.stringify(updated));
-              return updated;
-            });
+            try {
+              await fetch('https://kujto-ai.onrender.com/video-history', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ messages: [newVideo, ...videos] })
+              });
+            } catch (e) {}
+            setVideos(prev => [newVideo, ...prev]);
             break;
           }
           if (pollData.status && pollData.status !== 'processing') {

@@ -8,6 +8,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import cloudinary from './cloudinary.js';
+import { saveChatMessage, getChatHistory, saveVideoHistory, getVideoHistory } from './models.js';
 
 const app = express();
 const port = process.env.PORT || 8080;
@@ -196,7 +197,47 @@ app.post('/image-to-image', upload.single('init_image'), async (req, res) => {
   }
 });
 
-// (duplicate block removed)
+// Save chat message
+app.post('/chat-history', async (req, res) => {
+  const { role, content, image_url } = req.body;
+  try {
+    const msg = await saveChatMessage({ user_id: 'default', role, content, image_url });
+    res.json(msg);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to save chat message.' });
+  }
+});
+
+// Get chat history
+app.get('/chat-history', async (req, res) => {
+  try {
+    const history = await getChatHistory('default');
+    res.json(history);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch chat history.' });
+  }
+});
+
+// Save video history
+app.post('/video-history', async (req, res) => {
+  const { video_url, description } = req.body;
+  try {
+    const video = await saveVideoHistory({ user_id: 'default', video_url, description });
+    res.json(video);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to save video history.' });
+  }
+});
+
+// Get video history
+app.get('/video-history', async (req, res) => {
+  try {
+    const history = await getVideoHistory('default');
+    res.json(history);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch video history.' });
+  }
+});
 
 // POST /chat - expects { message: "..." }
 app.post('/chat', async (req, res) => {

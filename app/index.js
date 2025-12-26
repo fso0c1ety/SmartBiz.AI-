@@ -22,27 +22,31 @@ function AnimatedDots() {
 
 export default function App() {
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState([
-    { role: 'system', content: 'Hello this is SmartBiz.ai' }
-  ]);
+  const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [selectedImage, setSelectedImage] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [modalImageUrl, setModalImageUrl] = useState(null);
 
+  // Fetch chat history from backend on mount
   useEffect(() => {
     (async () => {
       try {
-        const saved = await AsyncStorage.getItem('chat_messages');
-        if (saved) setMessages(JSON.parse(saved));
-      } catch (e) {}
+        const res = await fetch('https://kujto-ai.onrender.com/chat-history', {
+          method: 'GET',
+        });
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setMessages(data);
+        } else if (Array.isArray(data.messages)) {
+          setMessages(data.messages);
+        }
+      } catch (e) {
+        setMessages([{ role: 'system', content: 'Hello this is SmartBiz.ai' }]);
+      }
     })();
   }, []);
-
-  useEffect(() => {
-    AsyncStorage.setItem('chat_messages', JSON.stringify(messages));
-  }, [messages]);
 
   const BACKEND_URL = "https://kujto-ai.onrender.com/chat";
   const POLLINATIONS_URL = "https://kujto-ai.onrender.com/generate-image";
@@ -164,6 +168,7 @@ export default function App() {
     const updatedMessages = [...messages, userMsg];
     setMessages(updatedMessages);
     try {
+      // Send chat request
       const res = await fetch(BACKEND_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -172,6 +177,12 @@ export default function App() {
       const data = await res.json();
       if (data.reply) {
         setMessages((prev) => [...prev, { role: 'assistant', content: data.reply }]);
+        // Save chat history to backend
+        await fetch('https://kujto-ai.onrender.com/chat-history', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages: [...updatedMessages, { role: 'assistant', content: data.reply }] })
+        });
       } else {
         setError(data.error || 'No reply from server.');
       }
