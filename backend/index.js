@@ -156,7 +156,7 @@ app.post('/image-to-image', upload.single('init_image'), async (req, res) => {
         prompt: `\nPlace the SAME product into a new scene.\nPreserve shape, label, and branding as closely as possible.\nProfessional product photography.\n${prompt}\n`.trim(),
         init_image: imageUrl,
         aspect_ratio: "1:1",
-        size: '1k',
+        size: '1024x1024',
         samples: '1',
         num_inference_steps: '30',
         guidance_scale: 6.5,
