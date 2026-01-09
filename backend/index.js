@@ -148,6 +148,11 @@ app.post('/image-to-image', upload.single('init_image'), async (req, res) => {
       return res.status(500).json({ error: 'Failed to upload image to Cloudinary.' });
     }
     // Send full set of fields from working example
+    // Compute a valid size per Modelslab requirements (WIDTHxHEIGHT, max 1024)
+    const srcW = typeof uploadResult.width === 'number' ? uploadResult.width : 1024;
+    const srcH = typeof uploadResult.height === 'number' ? uploadResult.height : 1024;
+    const square = Math.min(srcW, srcH, 1024);
+    const apiSize = `${square}x${square}`;
     const mlRes = await axios.post(
       'https://modelslab.com/api/v7/images/image-to-image',
       {
@@ -156,6 +161,7 @@ app.post('/image-to-image', upload.single('init_image'), async (req, res) => {
         prompt: `\nPlace the SAME product into a new scene.\nPreserve shape, label, and branding as closely as possible.\nProfessional product photography.\n${prompt}\n`.trim(),
         init_image: imageUrl,
         aspect_ratio: "1:1",
+        size: apiSize,
         samples: '1',
         num_inference_steps: '30',
         guidance_scale: 6.5,
