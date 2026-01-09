@@ -1,14 +1,13 @@
-import multer from 'multer';
-import FormData from 'form-data';
-import fs from 'fs';
-import express from 'express';
-import cors from 'cors';
 import axios from 'axios';
+import cors from 'cors';
 import dotenv from 'dotenv';
+import express from 'express';
+import fs from 'fs';
+import multer from 'multer';
 dotenv.config();
 
 import cloudinary from './cloudinary.js';
-import { saveChatMessage, getChatHistory, saveVideoHistory, getVideoHistory } from './models.js';
+import { getChatHistory, getVideoHistory, saveChatMessage, saveVideoHistory } from './models.js';
 
 const app = express();
 const port = process.env.PORT || 8080;
@@ -153,7 +152,7 @@ app.post('/image-to-image', upload.single('init_image'), async (req, res) => {
       'https://modelslab.com/api/v7/images/image-to-image',
       {
         key: 'Cp790n9sL087P3wLcxo6aJPVUifFPE7pPxVlnNO9K6QKlekEut7YMjBsCqv2',
-        model_id: 'seedream-4.5-i2i',
+        model_id: 'seedream-4.0-i2i',
         prompt: `\nPlace the SAME product into a new scene.\nPreserve shape, label, and branding as closely as possible.\nProfessional product photography.\n${prompt}\n`.trim(),
         init_image: imageUrl,
         width: '1024',
