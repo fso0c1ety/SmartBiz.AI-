@@ -156,7 +156,7 @@ app.post('/image-to-image', upload.single('init_image'), async (req, res) => {
       'https://modelslab.com/api/v7/images/image-to-image',
       {
         key: 'Cp790n9sL087P3wLcxo6aJPVUifFPE7pPxVlnNO9K6QKlekEut7YMjBsCqv2',
-        model_id: 'flux-2-pro',
+        model_id: 'nano-banana',
         prompt: `\nPlace the SAME product into a new scene.\nPreserve shape, label, and branding as closely as possible.\nProfessional product photography.\n${prompt}\n`.trim(),
         init_image: imageUrl,
         samples: '1',
