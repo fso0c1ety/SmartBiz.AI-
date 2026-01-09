@@ -24,13 +24,18 @@ export default function VideoLoading() {
           method: 'GET',
         });
         const data = await res.json();
+        let videosArr = [];
         if (Array.isArray(data)) {
-          setVideos(data);
+          videosArr = data;
         } else if (Array.isArray(data.messages)) {
-          setVideos(data.messages);
+          videosArr = data.messages;
         }
+        // Debug log: show video URLs
+        console.log('Loaded videos:', videosArr.map(v => v.video_url || v.url));
+        setVideos(videosArr);
       } catch (e) {
         setVideos([]);
+        console.log('Error loading videos:', e);
       }
     })();
   }, []);
@@ -65,16 +70,25 @@ export default function VideoLoading() {
             setVideoUrl(pollUrl);
             setLoading(false);
             finished = true;
-            // Save to backend video-history
-            const newVideo = { url: pollUrl, prompt, duration, created: Date.now() };
+            // Save to backend video-history with correct payload
+            const newVideo = {
+              video_url: pollUrl,
+              description: prompt ? `${prompt}${duration ? ` (Duration: ${duration}s)` : ''}` : '',
+            };
             try {
               await fetch('https://kujto-ai.onrender.com/video-history', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ messages: [newVideo, ...videos] })
+                body: JSON.stringify(newVideo)
               });
             } catch (e) {}
-            setVideos(prev => [newVideo, ...prev]);
+            setVideos(prev => [
+              {
+                video_url: pollUrl,
+                description: prompt ? `${prompt}${duration ? ` (Duration: ${duration}s)` : ''}` : '',
+              },
+              ...prev
+            ]);
             break;
           }
           if (pollData.status && pollData.status !== 'processing') {
@@ -112,16 +126,16 @@ export default function VideoLoading() {
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
           {videos.map((vid, idx) => (
             <TouchableOpacity
-              key={vid.url + idx}
+              key={(vid.video_url || vid.url || idx) + idx}
               style={{ width: '48%', alignItems: 'center', marginBottom: 24, backgroundColor: '#23242A', borderRadius: 14, padding: 8 }}
               onPress={() => {
-                setModalVideoUrl(vid.url);
+                setModalVideoUrl(vid.video_url || vid.url);
                 setModalVisible(true);
               }}
               activeOpacity={0.8}
             >
               <Video
-                source={{ uri: vid.url }}
+                source={{ uri: vid.video_url || vid.url }}
                 style={{ width: '100%', aspectRatio: 9/16, borderRadius: 12, backgroundColor: '#111' }}
                 isLooping
                 shouldPlay
@@ -129,6 +143,9 @@ export default function VideoLoading() {
                 useNativeControls={false}
                 isMuted={true}
               />
+              {vid.description ? (
+                <Text style={{ color: '#FFD700', fontSize: 12, marginTop: 4, textAlign: 'center' }}>{vid.description}</Text>
+              ) : null}
             </TouchableOpacity>
           ))}
               {/* Modal for full-size video preview */}

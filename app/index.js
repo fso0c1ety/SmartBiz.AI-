@@ -1,11 +1,11 @@
 // Animated 3-dot component
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, TextInput, ScrollView, Modal, Image, KeyboardAvoidingView, Platform, Alert, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
+import * as ImagePicker from 'expo-image-picker';
+import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { Alert, Image, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 function AnimatedDots() {
   const [dotCount, setDotCount] = useState(1);
@@ -22,33 +22,27 @@ function AnimatedDots() {
 
 export default function App() {
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState([
+    { role: 'system', content: 'Hello this is SmartBiz.ai' }
+  ]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [selectedImage, setSelectedImage] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [modalImageUrl, setModalImageUrl] = useState(null);
 
-  // Fetch chat history from backend on mount
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch('https://kujto-ai.onrender.com/chat-history', {
-          method: 'GET',
-        });
-        const data = await res.json();
-        const messagesArr = Array.isArray(data) ? data : (Array.isArray(data.messages) ? data.messages : []);
-        // Map image_url to imageUrl for frontend compatibility
-        const mapped = messagesArr.map(msg => ({
-          ...msg,
-          imageUrl: msg.image_url || undefined
-        }));
-        setMessages(mapped.length ? mapped : [{ role: 'system', content: 'Hello this is SmartBiz.ai' }]);
-      } catch (e) {
-        setMessages([{ role: 'system', content: 'Hello this is SmartBiz.ai' }]);
-      }
+        const saved = await AsyncStorage.getItem('chat_messages');
+        if (saved) setMessages(JSON.parse(saved));
+      } catch (e) {}
     })();
   }, []);
+
+  useEffect(() => {
+    AsyncStorage.setItem('chat_messages', JSON.stringify(messages));
+  }, [messages]);
 
   const BACKEND_URL = "https://kujto-ai.onrender.com/chat";
   const POLLINATIONS_URL = "https://kujto-ai.onrender.com/generate-image";
@@ -83,14 +77,7 @@ export default function App() {
     setError("");
     if (selectedImage) {
       if (/describe|what is|analyze|explain|text|caption|summarize|content|recognize|identify/i.test(input)) {
-        const userMsg = { role: 'user', content: `[Image-to-text: ${input}]`, imageUrl: selectedImage.uri };
-        setMessages((prev) => [...prev, userMsg]);
-        // Persist image-to-text user message
-        await fetch('https://kujto-ai.onrender.com/chat-history', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ role: 'user', content: `[Image-to-text: ${input}]`, image_url: selectedImage.uri })
-        });
+        setMessages((prev) => [...prev, { role: 'user', content: `[Image-to-text: ${input}]`, imageUrl: selectedImage.uri }]);
         try {
           let localUri = selectedImage.uri;
           let filename = localUri.split('/').pop();
@@ -106,12 +93,6 @@ export default function App() {
           const data = await res.json();
           if (data.reply) {
             setMessages((prev) => [...prev, { role: 'assistant', content: data.reply }]);
-            // Persist image-to-text assistant reply
-            await fetch('https://kujto-ai.onrender.com/chat-history', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ role: 'assistant', content: data.reply })
-            });
           }
         } catch (err) {
           setError('Network error.');
@@ -130,14 +111,14 @@ export default function App() {
       formData.append('init_image', { uri: localUri, name: filename, type });
       formData.append('prompt', input);
       // Show prompt and image in chat as soon as user sends
-      const userMsg = { role: 'user', content: input, imageUrl: selectedImage.uri };
-      setMessages((prev) => [...prev, userMsg]);
-      // Persist image-to-image user message
-      await fetch('https://kujto-ai.onrender.com/chat-history', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: 'user', content: input, image_url: selectedImage.uri })
-      });
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'user',
+          content: input,
+          imageUrl: selectedImage.uri
+        }
+      ]);
       try {
         const res = await fetch(IMAGE2IMAGE_URL, {
           method: 'POST',
@@ -147,12 +128,6 @@ export default function App() {
         let url = data.imageUrl || data.image_url || data.image || (data.output && data.output[0]);
         if (url) {
           setMessages((prev) => [...prev, { role: 'image', imageUrl: url, content: `Image-to-image result for: ${input}` }]);
-          // Persist image-to-image result
-          await fetch('https://kujto-ai.onrender.com/chat-history', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ role: 'image', content: `Image-to-image result for: ${input}`, image_url: url })
-          });
         } else {
           setError(data.error || 'No image returned.');
         }
@@ -165,14 +140,7 @@ export default function App() {
       return;
     }
     if (/generate an? image of|draw|create an? image of|make an? image of|picture of|image of|photo of/i.test(input)) {
-      const userMsg = { role: 'user', content: input };
-      setMessages((prev) => [...prev, userMsg]);
-      // Persist text-to-image user message
-      await fetch('https://kujto-ai.onrender.com/chat-history', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: 'user', content: input })
-      });
+      setMessages((prev) => [...prev, { role: 'user', content: input }]);
       try {
         const res = await fetch(POLLINATIONS_URL, {
           method: 'POST',
@@ -182,12 +150,6 @@ export default function App() {
         const data = await res.json();
         if (data.imageUrl) {
           setMessages((prev) => [...prev, { role: 'image', imageUrl: data.imageUrl, content: `Generated image for: ${input}` }]);
-          // Persist generated image message
-          await fetch('https://kujto-ai.onrender.com/chat-history', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ role: 'image', content: `Generated image for: ${input}`, image_url: data.imageUrl })
-          });
         } else {
           setError(data.error || 'No image generated.');
         }
@@ -202,7 +164,6 @@ export default function App() {
     const updatedMessages = [...messages, userMsg];
     setMessages(updatedMessages);
     try {
-      // Send chat request
       const res = await fetch(BACKEND_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -211,17 +172,6 @@ export default function App() {
       const data = await res.json();
       if (data.reply) {
         setMessages((prev) => [...prev, { role: 'assistant', content: data.reply }]);
-        // Save only the latest user and assistant messages to backend
-        await fetch('https://kujto-ai.onrender.com/chat-history', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ role: 'user', content: input })
-        });
-        await fetch('https://kujto-ai.onrender.com/chat-history', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ role: 'assistant', content: data.reply })
-        });
       } else {
         setError(data.error || 'No reply from server.');
       }
